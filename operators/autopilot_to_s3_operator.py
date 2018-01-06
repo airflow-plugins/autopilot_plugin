@@ -1,47 +1,50 @@
 from airflow.utils.decorators import apply_defaults
-from airflow.hooks.S3_hook import S3Hook
-from autopilot_plugin.hooks.autopilot_hook import AutopilotHook
+
 from airflow.models import BaseOperator
-import json
+from airflow.hooks.S3_hook import S3Hook
+
+from autopilot_plugin.hooks.autopilot_hook import AutopilotHook
+
 from tempfile import NamedTemporaryFile
+import json
 
 
 class AutopilotToS3Operator(BaseOperator):
     """
     Autopilot to S3 Operator
-    :param autopilot_conn_id: The Airflow connection id used to store
-        the Airflow credentials.
-    :type Autopilot_conn_id: string
-
-    :param autopilot_resource : resource to call. Possible values 
-        are [lists, smart_segments, contacts/custom_fields, triggers].
-        Leave blank if you want to list all contacts.
-    :type autopilot_resource: string
-
-    :param payload: *(optional)* payload to send with request.
-    :type payload: dict
-
-    :param results_field: *(optional* the field with the results from 
-        the api's response. Default to "contacts",  if contacts field
-         is true else defaults to the resource's name
-    :type results_field: string
-    
-    :param ids: *(optional)* ids for the api call (for smart_segments)
-    :type ids: array
-    
-    :param contacts: *(optional)* true if the operator should get
-        all contacts from resource. Default to false
-    :type contacts: bolean
-    
-    :param s3_conn_id:The Airflow connection id used to store
-            the S3 credentials.
-    :type s3_conn_id: string
-    
-    :param s3_bucket: The S3 bucket to be used to store the Autopilot data.
-    :type s3_bucket: string
-    
-    :param s3_key: The S3 key to be used to store the Autopilot data.
-    :type s3_bucket: string
+    :param autopilot_conn_id:       The Airflow connection id used to store
+                                    the Airflow credentials.
+    :type Autopilot_conn_id:        string
+    :param autopilot_resource :     Resource to call. Possible values are:
+                                     - lists
+                                     - smart_segments
+                                     - contacts/custom_fields
+                                     - triggers.
+                                    Leave blank if you want to list all contacts.
+    :type autopilot_resource:       string
+    :param payload:                 *(optional)* payload to send with request.
+    :type payload:                  dict
+    :param results_field:           *(optional* the field with the results from
+                                    the api's response. Default to "contacts",
+                                    if contacts field is true else defaults
+                                    to the resource's name
+    :type results_field:            string
+    :param ids:                     *(optional)* ids for the api call
+                                    (for smart_segments)
+    :type ids:                      array
+    :param contacts:                *(optional)* true if the operator should get
+                                    all contacts from resource.
+                                    Defaults to false
+    :type contacts:                 boolean
+    :param s3_conn_id:              The Airflow connection id used
+                                    to store the S3 credentials.
+    :type s3_conn_id:               string
+    :param s3_bucket:               The S3 bucket to be used
+                                    to store the Autopilot data.
+    :type s3_bucket:                string
+    :param s3_key:                  The S3 key to be used to store
+                                    the Autopilot data.
+    :type s3_bucket:                string
     """
     template_field = ('s3_key', )
 
@@ -119,7 +122,7 @@ class AutopilotToS3Operator(BaseOperator):
                                        "{}/{}".format(self.autopilot_resource, id),
                                        data=self.payload)
         elif self.contacts:
-            results += self.get_all_contacts(hook, 
+            results += self.get_all_contacts(hook,
                                 self.autopilot_resource,
                                 data=self.payload
                             )
