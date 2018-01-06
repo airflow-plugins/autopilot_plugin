@@ -9,8 +9,8 @@ class AutopilotHook(HttpHook):
 
     def get_conn(self, headers=None):
         conn = super().get_connection(self.http_conn_id)
-        self.headers =  {'autopilotapikey': conn.extra_dejson.get('key'),
-            'accept-encoding': 'application/json'}
+        self.headers = {'autopilotapikey': conn.extra_dejson.get('key'),
+                        'accept-encoding': 'application/json'}
         session = super().get_conn(self.headers)
 
         return session

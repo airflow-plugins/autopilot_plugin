@@ -19,7 +19,7 @@ class AutopilotToS3Operator(BaseOperator):
                                      - lists
                                      - smart_segments
                                      - contacts/custom_fields
-                                     - triggers.
+                                     - triggers
                                     Leave blank if you want to list all contacts.
     :type autopilot_resource:       string
     :param payload:                 *(optional)* payload to send with request.
@@ -57,20 +57,67 @@ class AutopilotToS3Operator(BaseOperator):
                  contacts=False,
                  s3_conn_id=None,
                  s3_bucket=None,
-                 payload=None,
                  s3_key=None,
+                 payload=None,
                  *args,
                  **kwargs):
         super().__init__(*args, **kwargs)
-        self.ids = ids
-        self.contacts = contacts
-        self.results_field = results_field
         self.autopilot_conn_id = autopilot_conn_id
         self.autopilot_resource = autopilot_resource
+        self.results_field = results_field
+        self.ids = ids
+        self.contacts = contacts
         self.s3_conn_id = s3_conn_id
-        self.payload = payload
         self.s3_bucket = s3_bucket
         self.s3_key = s3_key
+        self.payload = payload
+
+        if self.autopilot_resource.lower() not in ('lists',
+                                                   'smart_segments',
+                                                   'contacts/custom_fields',
+                                                   'triggers'):
+            raise Exception('Specified Autopilot resource not currently supported.')
+
+    def execute(self, context):
+        hook = AutopilotHook(http_conn_id=self.autopilot_conn_id)
+        hook.get_conn()
+
+        results = []
+        if self.ids and len(self.ids) != 0:
+            for id in self.ids:
+                if self.contacts:
+                    results += self.get_all_contacts(hook,
+                                                     "{}/{}/".format(self.autopilot_resource, id),
+                                                     data=self.payload
+                                                     )
+                else:
+                    results += self.get(hook,
+                                        "{}/{}".format(self.autopilot_resource, id),
+                                        data=self.payload)
+        elif self.contacts:
+            results += self.get_all_contacts(hook,
+                                             self.autopilot_resource,
+                                             data=self.payload
+                                             )
+        else:
+            results += self.get(hook,
+                                self.autopilot_resource,
+                                results_field=self.results_field,
+                                data=self.payload
+                                )
+
+        with NamedTemporaryFile("w") as tmp:
+            for result in results:
+                tmp.write(json.dumps(result) + '\n')
+            tmp.flush()
+            dest_s3 = S3Hook(s3_conn_id=self.s3_conn_id)
+            dest_s3.load_file(
+                filename=tmp.name,
+                key=self.s3_key,
+                bucket_name=self.s3_bucket,
+                replace=True
+            )
+            dest_s3.connection.close()
 
     def get_all_contacts(self, hook, resource, data=None, headers=None, extra_options=None):
         """
@@ -82,11 +129,15 @@ class AutopilotToS3Operator(BaseOperator):
 
         while len(all_pages) != total_contacts:
             if not next_token:
-                result = hook.run(resource + 'contacts', data,
-                                  headers, extra_options).json()
+                result = hook.run(resource + 'contacts',
+                                  data,
+                                  headers,
+                                  extra_options).json()
             else:
-                result = hook.run(resource + 'contacts/' +
-                                  next_token, data, headers, extra_options).json()
+                result = hook.run(resource + 'contacts/' + next_token,
+                                  data,
+                                  headers,
+                                  extra_options).json()
 
             all_pages += result.get('contacts')
             total_contacts = result.get('total_contacts')
@@ -103,48 +154,3 @@ class AutopilotToS3Operator(BaseOperator):
             return result.get(results_field)
         else:
             return result
-
-    def execute(self, context):
-        hook = AutopilotHook(http_conn_id=self.autopilot_conn_id)
-        hook.get_conn()
-
-        results = []
-        if self.ids and len(self.ids) != 0:
-            for id in self.ids:
-                if self.contacts:
-                    results += self.get_all_contacts(
-                            hook,
-                            "{}/{}/".format(self.autopilot_resource, id),
-                            data=self.payload
-                        )
-                else:
-                    results += self.get(hook,
-                                       "{}/{}".format(self.autopilot_resource, id),
-                                       data=self.payload)
-        elif self.contacts:
-            results += self.get_all_contacts(hook,
-                                self.autopilot_resource,
-                                data=self.payload
-                            )
-        else:
-            results += self.get(hook, self.autopilot_resource,
-                                    results_field=self.results_field,
-                                    data=self.payload
-                               )
-        print(results)
-
-        with NamedTemporaryFile("w") as tmp:
-            for result in results:
-                tmp.write(json.dumps(result) + '\n')
-
-            tmp.flush()
-
-            dest_s3 = S3Hook(s3_conn_id=self.s3_conn_id)
-            dest_s3.load_file(
-                filename=tmp.name,
-                key=self.s3_key,
-                bucket_name=self.s3_bucket,
-                replace=True
-            )
-            dest_s3.connection.close()
-            tmp.close()
