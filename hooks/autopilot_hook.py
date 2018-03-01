@@ -1,3 +1,16 @@
+"""
+Autopilot Hook
+https://autopilot.docs.apiary.io/
+
+This hook extends the Http Hook, changing the default method to "GET".
+
+To authenticate with this hook, set your Autopilot API Key as the value of a
+dictionary with the key "api_key" in the extras section of the connection
+object.
+
+Example. {"api_key":"XXXXXXXXXXX"}
+"""
+
 from airflow.hooks.http_hook import HttpHook
 
 
